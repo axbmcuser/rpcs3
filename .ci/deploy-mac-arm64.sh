@@ -32,10 +32,8 @@ rm -rf "rpcs3.app/Contents/Frameworks/QtPdf.framework" \
 ../../.ci/optimize-mac.sh rpcs3.app
 
 # Hack
-install_name_tool \
--delete_rpath /opt/homebrew/lib \
--delete_rpath /opt/homebrew/opt/llvm@$LLVM_COMPILER_VER/lib RPCS3.app/Contents/MacOS/rpcs3
-#-delete_rpath /opt/homebrew1/Cellar/sdl3/3.2.8/lib
+install_name_tool -delete_rpath /opt/homebrew/lib RPCS3.app/Contents/MacOS/rpcs3 || echo "Hack for deleting rpath /opt/homebrew/lib not needed"
+install_name_tool -delete_rpath /opt/homebrew/opt/llvm@$LLVM_COMPILER_VER/lib RPCS3.app/Contents/MacOS/rpcs3 || echo "Hack for deleting rpath /opt/homebrew/opt/llvm@$LLVM_COMPILER_VER/lib not needed"
 
 # Need to do this rename hack due to case insensitive filesystem
 mv rpcs3.app RPCS3_.app
@@ -48,24 +46,8 @@ echo "[InternetShortcut]" > Quickstart.url
 echo "URL=https://rpcs3.net/quickstart" >> Quickstart.url
 echo "IconIndex=0" >> Quickstart.url
 
-#DMG_FILEPATH="$BUILD_ARTIFACTSTAGINGDIRECTORY/rpcs3-v${COMM_TAG}-${COMM_COUNT}-${COMM_HASH}_macos_arm64.dmg"
-#"$BREW_X64_PATH/bin/create-dmg" --volname RPCS3 \
-#--window-size 800 400 \
-#--icon-size 100 \
-#--icon rpcs3.app 200 190 \
-#--add-file Quickstart.url Quickstart.url 400 20 \
-#--hide-extension rpcs3.app \
-#--hide-extension Quickstart.url \
-#--app-drop-link 600 185 \
-#--skip-jenkins \
-#--format ULMO \
-#"$DMG_FILEPATH" \
-#RPCS3.app
-#FILESIZE=$(stat -f %z "$DMG_FILEPATH")
-#SHA256SUM=$(shasum -a 256 "$DMG_FILEPATH" | awk '{ print $1 }')
-
 ARCHIVE_FILEPATH="$BUILD_ARTIFACTSTAGINGDIRECTORY/rpcs3-v${COMM_TAG}-${COMM_COUNT}-${COMM_HASH}_macos_arm64.7z"
-"$BREW_PATH/bin/7z" a -mx9 "$ARCHIVE_FILEPATH" RPCS3.app Quickstart.url
+"/opt/homebrew/bin/7z" a -mx9 "$ARCHIVE_FILEPATH" RPCS3.app Quickstart.url
 FILESIZE=$(stat -f %z "$ARCHIVE_FILEPATH")
 SHA256SUM=$(shasum -a 256 "$ARCHIVE_FILEPATH" | awk '{ print $1 }')
 

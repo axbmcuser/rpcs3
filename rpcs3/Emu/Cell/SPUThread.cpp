@@ -1612,10 +1612,14 @@ std::string spu_thread::dump_misc() const
 
 	fmt::append(ret, "Block Weight: %u (Retreats: %u)", block_counter, block_failure);
 
-	if (g_cfg.core.spu_prof)
+	if (u64 hash = atomic_storage<u64>::load(block_hash))
 	{
 		// Get short function hash and position in chunk
-		fmt::append(ret, "\nCurrent block: %s", spu_block_hash{atomic_storage<u64>::load(block_hash)});
+		fmt::append(ret, "\nCurrent block: %s", spu_block_hash{hash});
+	}
+	else if (g_cfg.core.spu_prof || g_cfg.core.spu_debug)
+	{
+		fmt::append(ret, "\nCurrent block: N/A");
 	}
 
 	const u32 offset = group ? SPU_FAKE_BASE_ADDR + (id & 0xffffff) * SPU_LS_SIZE : RAW_SPU_BASE_ADDR + index * RAW_SPU_OFFSET;
@@ -1899,6 +1903,12 @@ void spu_thread::cpu_task()
 		return fmt::format("%sSPU[0x%07x] Thread (%s) [0x%05x]", type >= spu_type::raw ? type == spu_type::isolated ? "Iso" : "Raw" : "", cpu->lv2_id, *name_cache.get(), cpu->pc);
 	};
 
+	if (get_type() == spu_type::threaded)
+	{
+		// Update thread name (spu_thread::lv2_id update)
+		thread_ctrl::set_name(*group->threads[group->threads_map[index]], thread_name);
+	}
+
 	constexpr u32 invalid_spurs = 0u - 0x80;
 
 	if (spurs_addr == 0)
@@ -1910,7 +1920,7 @@ void spu_thread::cpu_task()
 		}
 		else
 		{
-			const u32 arg = static_cast<u32>(group->args[index][1]);
+			const u32 arg = static_cast<u32>(group->args[group->threads_map[index]][1]);
 
 			if (group->name.ends_with("CellSpursKernelGroup"sv) && vm::check_addr(arg))
 			{
@@ -6959,7 +6969,7 @@ extern void resume_spu_thread_group_from_waiting(spu_thread& spu, std::array<sha
 				thread->state -= cpu_flag::suspend;
 			}
 
-			notify_spus[thread->index] = thread;
+			notify_spus[group->threads_map[thread->index]] = thread;
 		}
 	}
 }

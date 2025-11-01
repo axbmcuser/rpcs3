@@ -330,7 +330,17 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 					));
 				}
 
-				if (QMessageBox::No == QMessageBox::critical(this, title, message, QMessageBox::Yes, QMessageBox::No))
+				QMessageBox mb;
+				mb.setWindowModality(Qt::WindowModal);
+				mb.setWindowTitle(title);
+				mb.setIcon(QMessageBox::Critical);
+				mb.setTextFormat(Qt::RichText);
+				mb.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+				mb.setDefaultButton(QMessageBox::No);
+				mb.setText(message);
+				mb.layout()->setSizeConstraint(QLayout::SetFixedSize);
+
+				if (mb.exec() == QMessageBox::No)
 				{
 					// Reset if the messagebox was answered with no. This prevents the currentIndexChanged signal in EnhanceComboBox
 					ui->enableTSX->setCurrentIndex(find_item(ui->enableTSX, static_cast<int>(g_cfg.core.enable_TSX.def)));
@@ -640,21 +650,27 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 
 	// 3D
 	m_emu_settings->EnhanceComboBox(ui->stereoRenderMode, emu_settings_type::StereoRenderMode);
+	m_emu_settings->EnhanceCheckBox(ui->stereoRenderEnabled, emu_settings_type::StereoRenderEnabled);
 	SubscribeTooltip(ui->gb_stereo, tooltips.settings.stereo_render_mode);
 	if (game)
 	{
-		const auto on_resolution = [this](int index)
+		const auto enable_3D_modes = [this]()
 		{
-			const auto [text, value] = get_data(ui->resBox, index);
-			ui->stereoRenderMode->setEnabled(value == static_cast<int>(video_resolution::_720p));
+			const auto [text, value] = get_data(ui->resBox, ui->resBox->currentIndex());
+			const bool stereo_allowed = value == static_cast<int>(video_resolution::_720p);
+			const bool stereo_enabled = ui->stereoRenderEnabled->checkState() == Qt::CheckState::Checked;
+			ui->stereoRenderMode->setEnabled(stereo_allowed && stereo_enabled);
+			ui->stereoRenderEnabled->setEnabled(stereo_allowed);
 		};
-		connect(ui->resBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, on_resolution);
-		on_resolution(ui->resBox->currentIndex());
+		connect(ui->resBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [enable_3D_modes](int){ enable_3D_modes(); });
+		connect(ui->stereoRenderEnabled, &QCheckBox::checkStateChanged, this, [enable_3D_modes](Qt::CheckState){ enable_3D_modes(); });
+		enable_3D_modes();
 	}
 	else
 	{
 		ui->stereoRenderMode->setCurrentIndex(find_item(ui->stereoRenderMode, static_cast<int>(g_cfg.video.stereo_render_mode.def)));
-		ui->stereoRenderMode->setEnabled(false);
+		ui->stereoRenderEnabled->setChecked(false);
+		ui->gb_stereo->setEnabled(false);
 	}
 
 	// Checkboxes: main options
@@ -1412,6 +1428,12 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 	m_emu_settings->EnhanceComboBox(ui->keyboardType, emu_settings_type::KeyboardType, false, false, 0, true);
 	SubscribeTooltip(ui->gb_keyboardType, tooltips.settings.keyboard_type);
 
+	m_emu_settings->EnhanceComboBox(ui->dateFormat, emu_settings_type::DateFormat);
+	SubscribeTooltip(ui->gb_dateFormat, tooltips.settings.date_format);
+
+	m_emu_settings->EnhanceComboBox(ui->timeFormat, emu_settings_type::TimeFormat);
+	SubscribeTooltip(ui->gb_timeFormat, tooltips.settings.time_format);
+
 	// Checkboxes
 
 	m_emu_settings->EnhanceCheckBox(ui->enableHostRoot, emu_settings_type::EnableHostRoot);
@@ -1787,12 +1809,28 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 		}
 	});
 
+	connect(ui->lleList, &QListWidget::itemDoubleClicked, this, [](QListWidgetItem* item)
+	{
+		if (!item)
+			return;
+
+		item->setCheckState(item->checkState() != Qt::CheckState::Unchecked ? Qt::CheckState::Unchecked : Qt::CheckState::Checked);
+	});
+
 	connect(ui->hleList, &QListWidget::itemChanged, [this](QListWidgetItem* item)
 	{
 		for (auto cb : ui->hleList->selectedItems())
 		{
 			cb->setCheckState(item->checkState());
 		}
+	});
+
+	connect(ui->hleList, &QListWidget::itemDoubleClicked, this, [](QListWidgetItem* item)
+	{
+		if (!item)
+			return;
+
+		item->setCheckState(item->checkState() != Qt::CheckState::Unchecked ? Qt::CheckState::Unchecked : Qt::CheckState::Checked);
 	});
 
 	connect(this, &settings_dialog::signal_restore_dependant_defaults, this, reset_library_lists);
@@ -1845,14 +1883,15 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 	SubscribeTooltip(ui->useNativeInterface, tooltips.settings.use_native_interface);
 
 #if defined(__linux__)
-	ui->enableGamemode->setVisible(true);
-#endif
 #if defined(GAMEMODE_AVAILABLE)
-	ui->enableGamemode->setEnabled(true);
 	m_emu_settings->EnhanceCheckBox(ui->enableGamemode, emu_settings_type::EnableGamemode);
 	SubscribeTooltip(ui->enableGamemode, tooltips.settings.enable_gamemode);
 #else
+	ui->enableGamemode->setEnabled(false);
 	SubscribeTooltip(ui->enableGamemode, tooltips.settings.no_gamemode);
+#endif
+#else
+	ui->enableGamemode->setVisible(false);
 #endif
 
 	m_emu_settings->EnhanceCheckBox(ui->showShaderCompilationHint, emu_settings_type::ShowShaderCompilationHint);
@@ -1875,6 +1914,9 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 
 	m_emu_settings->EnhanceCheckBox(ui->showCaptureHints, emu_settings_type::ShowCaptureHints);
 	SubscribeTooltip(ui->showCaptureHints, tooltips.settings.show_capture_hints);
+
+	m_emu_settings->EnhanceCheckBox(ui->recordWithOverlays, emu_settings_type::RecordWithOverlays);
+	SubscribeTooltip(ui->recordWithOverlays, tooltips.settings.record_with_overlays);
 
 	m_emu_settings->EnhanceCheckBox(ui->pauseDuringHomeMenu, emu_settings_type::PauseDuringHomeMenu);
 	SubscribeTooltip(ui->pauseDuringHomeMenu, tooltips.settings.pause_during_home_menu);
@@ -2456,6 +2498,9 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 	m_emu_settings->EnhanceCheckBox(ui->forceHwMSAAResolve, emu_settings_type::ForceHwMSAAResolve);
 	SubscribeTooltip(ui->forceHwMSAAResolve, tooltips.settings.force_hw_MSAA);
 
+	m_emu_settings->EnhanceCheckBox(ui->useReBAR, emu_settings_type::UseReBAR);
+	SubscribeTooltip(ui->useReBAR, tooltips.settings.use_ReBAR);
+
 	m_emu_settings->EnhanceCheckBox(ui->disableOnDiskShaderCache, emu_settings_type::DisableOnDiskShaderCache);
 	SubscribeTooltip(ui->disableOnDiskShaderCache, tooltips.settings.disable_on_disk_shader_cache);
 
@@ -2499,6 +2544,9 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 	// Checkboxes: IO debug options
 	m_emu_settings->EnhanceCheckBox(ui->debugOverlayIO, emu_settings_type::IoDebugOverlay);
 	SubscribeTooltip(ui->debugOverlayIO, tooltips.settings.debug_overlay_io);
+
+	m_emu_settings->EnhanceCheckBox(ui->debugOverlayMouse, emu_settings_type::MouseDebugOverlay);
+	SubscribeTooltip(ui->debugOverlayMouse, tooltips.settings.debug_overlay_mouse);
 
 	// Comboboxes
 

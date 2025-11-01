@@ -195,17 +195,17 @@ const auto ppu_gateway = build_function_asm<void(*)(ppu_thread*)>("ppu_gateway",
 	c.push(x86::rdi);
 	c.push(x86::rbp);
 	c.push(x86::rbx);
-	c.sub(x86::rsp, 0xa8);
-	c.movaps(x86::oword_ptr(x86::rsp, 0x90), x86::xmm15);
-	c.movaps(x86::oword_ptr(x86::rsp, 0x80), x86::xmm14);
-	c.movaps(x86::oword_ptr(x86::rsp, 0x70), x86::xmm13);
-	c.movaps(x86::oword_ptr(x86::rsp, 0x60), x86::xmm12);
-	c.movaps(x86::oword_ptr(x86::rsp, 0x50), x86::xmm11);
-	c.movaps(x86::oword_ptr(x86::rsp, 0x40), x86::xmm10);
-	c.movaps(x86::oword_ptr(x86::rsp, 0x30), x86::xmm9);
-	c.movaps(x86::oword_ptr(x86::rsp, 0x20), x86::xmm8);
-	c.movaps(x86::oword_ptr(x86::rsp, 0x10), x86::xmm7);
-	c.movaps(x86::oword_ptr(x86::rsp, 0), x86::xmm6);
+	c.sub(x86::rsp, 0xc8);
+	c.movaps(x86::oword_ptr(x86::rsp, 0xb0), x86::xmm15);
+	c.movaps(x86::oword_ptr(x86::rsp, 0xa0), x86::xmm14);
+	c.movaps(x86::oword_ptr(x86::rsp, 0x90), x86::xmm13);
+	c.movaps(x86::oword_ptr(x86::rsp, 0x80), x86::xmm12);
+	c.movaps(x86::oword_ptr(x86::rsp, 0x70), x86::xmm11);
+	c.movaps(x86::oword_ptr(x86::rsp, 0x60), x86::xmm10);
+	c.movaps(x86::oword_ptr(x86::rsp, 0x50), x86::xmm9);
+	c.movaps(x86::oword_ptr(x86::rsp, 0x40), x86::xmm8);
+	c.movaps(x86::oword_ptr(x86::rsp, 0x30), x86::xmm7);
+	c.movaps(x86::oword_ptr(x86::rsp, 0x20), x86::xmm6);
 #else
 	c.push(x86::rbp);
 	c.push(x86::r15);
@@ -252,17 +252,17 @@ const auto ppu_gateway = build_function_asm<void(*)(ppu_thread*)>("ppu_gateway",
 	}
 
 #ifdef _WIN32
-	c.movaps(x86::xmm6, x86::oword_ptr(x86::rsp, 0));
-	c.movaps(x86::xmm7, x86::oword_ptr(x86::rsp, 0x10));
-	c.movaps(x86::xmm8, x86::oword_ptr(x86::rsp, 0x20));
-	c.movaps(x86::xmm9, x86::oword_ptr(x86::rsp, 0x30));
-	c.movaps(x86::xmm10, x86::oword_ptr(x86::rsp, 0x40));
-	c.movaps(x86::xmm11, x86::oword_ptr(x86::rsp, 0x50));
-	c.movaps(x86::xmm12, x86::oword_ptr(x86::rsp, 0x60));
-	c.movaps(x86::xmm13, x86::oword_ptr(x86::rsp, 0x70));
-	c.movaps(x86::xmm14, x86::oword_ptr(x86::rsp, 0x80));
-	c.movaps(x86::xmm15, x86::oword_ptr(x86::rsp, 0x90));
-	c.add(x86::rsp, 0xa8);
+	c.movaps(x86::xmm6, x86::oword_ptr(x86::rsp, 0x20));
+	c.movaps(x86::xmm7, x86::oword_ptr(x86::rsp, 0x30));
+	c.movaps(x86::xmm8, x86::oword_ptr(x86::rsp, 0x40));
+	c.movaps(x86::xmm9, x86::oword_ptr(x86::rsp, 0x50));
+	c.movaps(x86::xmm10, x86::oword_ptr(x86::rsp, 0x60));
+	c.movaps(x86::xmm11, x86::oword_ptr(x86::rsp, 0x70));
+	c.movaps(x86::xmm12, x86::oword_ptr(x86::rsp, 0x80));
+	c.movaps(x86::xmm13, x86::oword_ptr(x86::rsp, 0x90));
+	c.movaps(x86::xmm14, x86::oword_ptr(x86::rsp, 0xa0));
+	c.movaps(x86::xmm15, x86::oword_ptr(x86::rsp, 0xb0));
+	c.add(x86::rsp, 0xc8);
 	c.pop(x86::rbx);
 	c.pop(x86::rbp);
 	c.pop(x86::rdi);
@@ -934,13 +934,40 @@ struct ppu_far_jumps_t
 	ppu_far_jumps_t(int) noexcept {}
 
 	std::map<u32, all_info_t> vals;
+	std::pair<u32, u32> vals_range{0, 0};
 	::jit_runtime rt;
 
 	mutable shared_mutex mutex;
 
+	void add_value(u32 addr, all_info_t info)
+	{
+		vals.insert_or_assign(addr, std::move(info));
+
+		if (vals.size() == 1)
+		{
+			vals_range.first = addr;
+			vals_range.second = addr;
+		}
+		else
+		{
+			vals_range.first = std::min<u32>(vals_range.first, addr);
+			vals_range.second = std::max<u32>(vals_range.second, addr);
+		}
+	}
+
 	// Get target address, 'ppu' is used in ppu_far_jump in order to modify registers
 	u32 get_target(u32 pc, ppu_thread* ppu = nullptr)
 	{
+		if (vals_range.first > pc)
+		{
+			return 0;
+		}
+
+		if (vals_range.second < pc)
+		{
+			return 0;
+		}
+
 		reader_lock lock(mutex);
 
 		if (auto it = vals.find(pc); it != vals.end())
@@ -949,13 +976,23 @@ struct ppu_far_jumps_t
 			return all_info.get_target(pc, ppu);
 		}
 
-		return {};
+		return 0;
 	}
 
 	// Get function patches in range (entry -> target)
 	std::vector<std::pair<u32, u32>> get_targets(u32 pc, u32 size)
 	{
 		std::vector<std::pair<u32, u32>> targets;
+
+		if (vals_range.first >= pc + size)
+		{
+			return targets;
+		}
+
+		if (vals_range.second < pc)
+		{
+			return targets;
+		}
 
 		reader_lock lock(mutex);
 
@@ -1005,22 +1042,21 @@ struct ppu_far_jumps_t
 
 #ifdef ARCH_X64
 				c.mov(args[0], x86::rbp);
-				c.mov(x86::dword_ptr(args[0], ::offset32(&ppu_thread::cia)), pc);
+				c.mov(args[2], vm::g_base_addr + pc);
 				c.jmp(ppu_far_jump);
 #else
 				Label jmp_address = c.newLabel();
-				Label imm_address = c.newLabel();
+				Label this_op_address = c.newLabel();
 
-				c.ldr(args[1].w(), arm::ptr(imm_address));
-				c.str(args[1].w(), arm::Mem(args[0], ::offset32(&ppu_thread::cia)));
+				c.ldr(args[2], arm::ptr(this_op_address));
 				c.ldr(args[1], arm::ptr(jmp_address));
 				c.br(args[1]);
 
 				c.align(AlignMode::kCode, 16);
 				c.bind(jmp_address);
 				c.embedUInt64(reinterpret_cast<u64>(ppu_far_jump));
-				c.bind(imm_address);
-				c.embedUInt32(pc);
+				c.bind(this_op_address);
+				c.embedUInt64(reinterpret_cast<u64>(vm::g_base_addr) + pc);
 #endif
 			}, &rt);
 		}
@@ -1039,9 +1075,9 @@ u32 ppu_get_far_jump(u32 pc)
 	return g_fxo->get<ppu_far_jumps_t>().get_target(pc);
 }
 
-static void ppu_far_jump(ppu_thread& ppu, ppu_opcode_t, be_t<u32>*, ppu_intrp_func*)
+static void ppu_far_jump(ppu_thread& ppu, ppu_opcode_t, be_t<u32>* this_op, ppu_intrp_func*)
 {
-	const u32 cia = g_fxo->get<ppu_far_jumps_t>().get_target(ppu.cia, &ppu);
+	const u32 cia = g_fxo->get<ppu_far_jumps_t>().get_target(vm::get_addr(this_op), &ppu);
 
 	if (!vm::check_addr(cia, vm::page_executable))
 	{
@@ -1110,7 +1146,7 @@ bool ppu_form_branch_to_code(u32 entry, u32 target, bool link, bool with_toc, st
 	auto& jumps = g_fxo->get<ppu_far_jumps_t>();
 
 	std::lock_guard lock(jumps.mutex);
-	jumps.vals.insert_or_assign(entry, ppu_far_jumps_t::all_info_t{target, link, with_toc, std::move(module_name)});
+	jumps.add_value(entry, ppu_far_jumps_t::all_info_t{target, link, with_toc, std::move(module_name)});
 	ppu_register_function_at(entry, 4, g_cfg.core.ppu_decoder == ppu_decoder_type::_static ? &ppu_far_jump : ensure(g_fxo->get<ppu_far_jumps_t>().gen_jump<false>(entry)));
 
 	return true;
@@ -5214,6 +5250,7 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 				{
 					// Replace the function with ppu_far_jump
 					fpos++;
+					part.excluded_funcs.emplace_back(func.addr);
 					continue;
 				}
 			}
@@ -5242,6 +5279,11 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 			for (const auto& func : part.get_funcs())
 			{
 				if (func.size == 0)
+				{
+					continue;
+				}
+
+				if (std::count(part.excluded_funcs.begin(), part.excluded_funcs.end(), func.addr))
 				{
 					continue;
 				}
@@ -5340,6 +5382,13 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 				{
 					if (func.size == 0)
 					{
+						continue;
+					}
+
+					if (g_fxo->is_init<ppu_far_jumps_t>() && !g_fxo->get<ppu_far_jumps_t>().get_targets(func.addr, func.size).empty())
+					{
+						// Filter out functions with patches
+						part.excluded_funcs.emplace_back(func.addr);
 						continue;
 					}
 
@@ -5754,7 +5803,11 @@ static void ppu_initialize2(jit_compiler& jit, const ppu_module<lv2_obj>& module
 	std::unique_ptr<Module> _module = std::make_unique<Module>(obj_name, jit.get_context());
 
 	// Initialize target
+#if LLVM_VERSION_MAJOR >= 21 && (LLVM_VERSION_MINOR >= 1 || LLVM_VERSION_MAJOR >= 22)
+	_module->setTargetTriple(Triple(jit_compiler::triple1()));
+#else
 	_module->setTargetTriple(jit_compiler::triple1());
+#endif
 	_module->setDataLayout(jit.get_engine().getTargetMachine()->createDataLayout());
 
 	// Initialize translator
@@ -5779,6 +5832,11 @@ static void ppu_initialize2(jit_compiler& jit, const ppu_module<lv2_obj>& module
 	{
 		if (func.size)
 		{
+			if (std::count(module_part.excluded_funcs.begin(), module_part.excluded_funcs.end(), func.addr))
+			{
+				continue;
+			}
+
 			const auto f = cast<Function>(_module->getOrInsertFunction(fmt::format("__0x%x", func.addr - reloc), _func).getCallee());
 			f->setCallingConv(CallingConv::GHC);
 			f->addParamAttr(1, llvm::Attribute::NoAlias);
@@ -5834,6 +5892,11 @@ static void ppu_initialize2(jit_compiler& jit, const ppu_module<lv2_obj>& module
 
 			if (mod_func.size)
 			{
+				if (std::count(module_part.excluded_funcs.begin(), module_part.excluded_funcs.end(), mod_func.addr))
+				{
+					continue;
+				}
+
 				num_func++;
 				guest_code_size += mod_func.size;
 				max_addr = std::max<u32>(max_addr, mod_func.addr + mod_func.size);
