@@ -1809,18 +1809,18 @@ bool lv2_obj::awake_unlocked(cpu_thread* cpu, s32 prio)
 			// When not being set to All timers - activate only for sys_ppu_thread_start
 			if (is_create_thread || g_cfg.core.sleep_timers_accuracy == sleep_timers_accuracy_level::_all_timers)
 			{
-				
+
 				//bool GameIs_SegaRallyOnlineArcade = (Emu.GetTitleID() == "NPUB30375" || Emu.GetTitleID() == "NPEB00381" || Emu.GetTitleID() == "NPHB00310") ? true : false;
-				
+
 				if (!current_ppu->state.test_and_set(cpu_flag::yield) || current_ppu->hw_sleep_time != 0)
 				{
 					current_ppu->hw_sleep_time += (is_create_thread ? 51 : 35);
-					
+
 					//if (GameIs_SegaRallyOnlineArcade)
 					//{
 					//	current_ppu->hw_sleep_time += -1000;
 					//}
-					
+
 					//current_ppu->hw_sleep_time += (is_create_thread ? 0 : 0);
 				}
 				else
