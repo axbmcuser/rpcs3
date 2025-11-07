@@ -80,7 +80,7 @@ namespace rsx
 
 		void ZCULL_control::check_state(class ::rsx::thread* ptimer, bool flush_queue)
 		{
-			bool GameIs_SegaRallyRevo = (Emu.GetTitleID() == "BLES00107" || Emu.GetTitleID() == "BLES00108" || Emu.GetTitleID() == "BLUS30068" || Emu.GetTitleID() == "BLJM60057" || Emu.GetTitleID() == "NPEB90018" || Emu.GetTitleID() == "NPUB90055" || Emu.GetTitleID() == "NPJB90076" || Emu.GetTitleID() == "NPHB00014") ? true : false;
+			bool GameIs_SegaRallyRevo = (Emu.GetTitleID() == "BLES00107" || Emu.GetTitleID() == "BLES00108" || Emu.GetTitleID() == "BLUS30068" || Emu.GetTitleID() == "BLJM60057" || Emu.GetTitleID() == "NPEB90018" || Emu.GetTitleID() == "NPUB90055" || Emu.GetTitleID() == "NPJB90076" || Emu.GetTitleID() == "NPHB00014");
 
 			// NOTE: Only enable host queries if pixel count is active to save on resources
 			// Can optionally be enabled for either stats enabled or zpass enabled for accuracy
@@ -94,7 +94,7 @@ namespace rsx
 			{
 				const bool data_stream_available = zpass_count_enabled; // write_enabled && (zpass_count_enabled || stats_enabled);
 			}
-			
+
 			if (host_queries_active && !data_stream_available)
 			{
 				// Stop
@@ -334,8 +334,8 @@ namespace rsx
 		{
 			ensure(sink);
 
-			bool GameIs_SegaRallyRevo = (Emu.GetTitleID() == "BLES00107" || Emu.GetTitleID() == "BLES00108" || Emu.GetTitleID() == "BLUS30068" || Emu.GetTitleID() == "BLJM60057" || Emu.GetTitleID() == "NPEB90018" || Emu.GetTitleID() == "NPUB90055" || Emu.GetTitleID() == "NPJB90076" || Emu.GetTitleID() == "NPHB00014") ? true : false;
-			
+			bool GameIs_SegaRallyRevo = (Emu.GetTitleID() == "BLES00107" || Emu.GetTitleID() == "BLES00108" || Emu.GetTitleID() == "BLUS30068" || Emu.GetTitleID() == "BLJM60057" || Emu.GetTitleID() == "NPEB90018" || Emu.GetTitleID() == "NPUB90055" || Emu.GetTitleID() == "NPJB90076" || Emu.GetTitleID() == "NPHB00014");
+
 			auto scale_result = [](u32 value)
 			{
 				const auto scale = rsx::get_resolution_scale_percent();
@@ -1042,3 +1042,4 @@ namespace rsx
 		}
 	}
 }
+
